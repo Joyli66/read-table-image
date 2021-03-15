@@ -1,5 +1,5 @@
 # read-table-image ![](https://img.shields.io/badge/read-image-brightgreen.svg) ![](https://img.shields.io/badge/Tesseract-v5.0.0-yellowgreen.svg)
-This project translates a table image to editable texts and outputs a structured JSON file.
+This project translates table images to editable texts and outputs a structured JSON files.
 <br>
 ## Requirements
 Python 3.7  
