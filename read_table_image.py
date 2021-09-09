@@ -86,15 +86,18 @@ def find_cells(img):
     scale = 150  # the larger, the rectangles smaller
     # the second parameter of kernel and morphology iterations /
     # need to be fine-tuned according to the image size
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (cols // scale, rows // scale + 1))
-    eroded = cv2.morphologyEx(thresh, cv2.MORPH_GRADIENT, kernel, iterations=3)
-    eroded = cv2.bitwise_not(eroded)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (cols // scale, rows // scale + 2))
+    # Another method for erosion
+    # eroded = cv2.morphologyEx(thresh, cv2.MORPH_GRADIENT, kernel, iterations=3)
+    # eroded = cv2.bitwise_not(eroded)
+    eroded = cv2.erode(thresh, kernel, iterations=3)
     # comment the next line to save images after morphology processing
-    # cv2.imwrite("eroded.jpg", eroded)
+    cv2.imwrite(target_dir + '/' + "{}_eroded.jpg".format(pmc), eroded)
 
-    # first remove a few pixels and then add white borders before finding contours
-    eroded = eroded[10:(rows - 10), 10:(cols - 10)]
+    # Add white borders before finding contours
+    # eroded = eroded[10:(rows - 10), 10:(cols - 10)]
     eroded = cv2.copyMakeBorder(eroded, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    thresh = cv2.copyMakeBorder(thresh, 10, 10, 10, 10, cv2.BORDER_CONSTANT, value=[255, 255, 255])
     contours, hierarchy = cv2.findContours(eroded, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     # 'cells' save the location and sort
@@ -102,7 +105,7 @@ def find_cells(img):
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
         # case 1：eliminate rectangles that are too thin (might be lines)
-        if w > h * 30 or h > w * 30:
+        if w > h * 20 or h > w * 20:
             continue
         # case 2：remove a box similar to the whole image
         if (w > size[1] * 0.8) and (h > size[0] * 0.8):
@@ -111,7 +114,7 @@ def find_cells(img):
         # case 3: eliminate small boxes that could be noises
         area = cv2.contourArea(c)
         # method 1: constant area. Does not work on images that are too large or too small
-        if area < 200:
+        if area < 250:
             continue
         # method 2: proportional area
         # if area > 0:
@@ -120,7 +123,7 @@ def find_cells(img):
 
         cells.append((x, y, w, h))
 
-    # 可能上下只差1 pixel,但左右顺序就错了
+    # To avoid location errors in one line
     cells = sorted(cells, key=itemgetter(1, 0))
 
     return cells, added, thresh
@@ -157,21 +160,20 @@ def cell2table(cells, added, thresh, target_dir, pmc):
             # save a new line
             row = []
 
+    '''
+    # The block (have not fully developed) is used to recognize section names in the left-most column
+    
     for row in table_row:
         new_row = []
         row.sort(key=lambda x: x[0])
-
-        '''
-        next two commented blocks recognize section names in the left-most column
-        '''
-
+        
         # start = row[0]
         # # row(i)[0][x]+[w] < row(i+1)[0][x] means the below cell is blank
         # if prev[0] + prev[2] < start[0]:
         # append to the above line
 
         for (j, (x, y, w, h)) in enumerate(row):
-
+            print(row)
             # # if cells in the first column have all white pixels below, marked as section name
             # # x<w ensures it is in the first column
             # if j == 0 and x<w and eroded[x, y+2*h] > 0:
@@ -181,14 +183,19 @@ def cell2table(cells, added, thresh, target_dir, pmc):
             #     new_row=[]
             #     continue
 
-            text = img2text(thresh, x, y, w, h)
-            new_row.append(text)
+            new_row.append(img2text(thresh, x, y, w, h))
 
             # comment to write OCR results directly in the image
             # font = cv2.FONT_HERSHEY_SIMPLEX
             # cv2.putText(added, text, (x, y - 10), font, 1, color, 1);
 
         table_row.append(new_row)
+    '''
+
+    for row in table_row:
+        row.sort(key=lambda x: x[0])
+        for (i, (x, y, w, h)) in enumerate(row):
+            row[i] = img2text(thresh, x, y, w, h)
 
     cv2.imwrite(target_dir + '/' + "{}_result.jpg".format(pmc), added)
 
@@ -228,7 +235,8 @@ def text2json(table_row):
                 footer = superline
 
     # remove titles and footers
-    table_row = table_row[cnt1: len(table_row) - 1 - cnt2]
+    # table_row = table_row[cnt1: len(table_row) - 1 - cnt2]
+    table_row = table_row[cnt1: len(table_row) - cnt2]
 
     table = {}
     sections = []
@@ -288,9 +296,9 @@ if __name__ == "__main__":
     # time_start = time.time()
 
     # change the imgPath to the path of your image folder
-    imgPath = ''
+    imgPath = 'first'
     # change the target_dir to the path where you save the results
-    target_dir = ''
+    target_dir = 'out'
 
     img_list = os.listdir(imgPath)
     for imglist in img_list:
